@@ -13,7 +13,8 @@
       "Bash(lsof:*)",
       "Bash(brew services:*)",
       "Bash(curl:*)",
-      "Bash(do docker:*)"
+      "Bash(do docker:*)",
+      "Bash(bash:*)"
     ]
   }
 }
