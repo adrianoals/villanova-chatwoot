@@ -1,0 +1,40 @@
+# Environment variables (contain secrets)
+.env
+*.env
+chatwoot/.env
+
+# Docker volumes and data
+postgres_data/
+redis_data/
+storage_data/
+
+# Backups
+*.sql
+*.sql.gz
+backups/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Logs
+*.log
+
+# Temporary files
+/tmp/
+*.tmp

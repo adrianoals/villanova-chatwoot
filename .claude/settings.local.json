@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip3 install:*)",
+      "Bash(python3:*)",
+      "Bash(gh api:*)",
+      "Bash(brew list:*)",
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(docker:*)",
+      "Bash(openssl rand:*)",
+      "Bash(lsof:*)",
+      "Bash(brew services:*)",
+      "Bash(curl:*)",
+      "Bash(do docker:*)"
+    ]
+  }
+}

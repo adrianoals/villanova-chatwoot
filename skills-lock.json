@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "chatwoot": {
+      "source": "vm0-ai/vm0-skills",
+      "sourceType": "github",
+      "computedHash": "91ef09b57e72ed441c865de132b279ef9474c3c096984bafcc57b0373574f79b"
+    },
+    "skill-creator": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "9b03bb78ec5c81c4e0546dbb78cfc970368c72dcae5482e8c59690175abbc8e7"
+    }
+  }
+}
