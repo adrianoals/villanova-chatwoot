@@ -14,7 +14,8 @@
       "Bash(brew services:*)",
       "Bash(curl:*)",
       "Bash(do docker:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "WebFetch(domain:doc.evolution-api.com)"
     ]
   }
 }
