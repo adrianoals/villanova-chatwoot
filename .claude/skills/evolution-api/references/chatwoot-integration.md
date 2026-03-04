@@ -140,34 +140,62 @@ curl -X GET http://localhost:8080/chatwoot/find/whatsapp-comercial \
 
 ## Docker Networking
 
-When running both services in Docker, they need to be on the same network or use proper hostnames:
+When running both services in Docker, they need to communicate. **Do NOT rely on `host.docker.internal`** — it's unreliable on Docker Desktop/WSL2 and causes `ENOTFOUND` errors.
 
-### Option A: Same docker-compose (recommended for local dev)
+### Option A: Shared external network (recommended)
 
-Put both services in the same `docker-compose.yaml` and use service names:
-- Evolution API uses `http://rails:3000` for Chatwoot URL
-- Chatwoot webhook points to `http://evolution-api:8080`
+Create one external network and connect both stacks to it. Each stack keeps its own internal network for its own services (postgres, redis) but shares the external network for cross-stack communication.
 
-### Option B: Separate docker-compose files
-
-Create an external network:
 ```bash
-docker network create shared-net
+docker network create villanova-net
 ```
 
-Add to both docker-compose files:
+In **Chatwoot** `docker-compose.yaml`, add to rails and sidekiq:
 ```yaml
+services:
+  rails:
+    networks:
+      - default
+      - villanova-net
+  sidekiq:
+    networks:
+      - default
+      - villanova-net
+
 networks:
-  default:
+  villanova-net:
     external: true
-    name: shared-net
 ```
 
-### Option C: Public URLs (production)
+In **Evolution API** `docker-compose.yaml`, add to evolution-api:
+```yaml
+services:
+  evolution-api:
+    networks:
+      - evolution-net
+      - villanova-net
+
+networks:
+  evolution-net:
+    driver: bridge
+  villanova-net:
+    external: true
+```
+
+Then use container names as hostnames:
+- Evolution API → Chatwoot: `http://chatwoot-rails-1:3000`
+- Chatwoot → Evolution API: `http://evolution_api:8080`
+- Set `SERVER_URL=http://evolution_api:8080` in Evolution API `.env`
+
+**Important:** Always start Chatwoot before Evolution API so the shared network and Rails container are ready.
+
+### Option B: Public URLs (production)
 
 Use the public domain names:
 - `https://chat.empresa.com.br` for Chatwoot
 - `https://api.empresa.com.br` for Evolution API
+
+This is the simplest and most reliable approach — no special Docker networking needed.
 
 ## Multi-Department Setup
 

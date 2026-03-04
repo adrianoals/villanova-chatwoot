@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head><title>WhatsApp QR Code - Villa Nova</title></head>
+<body style="display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f0f0f0;flex-direction:column">
+<h2>Escaneie o QR Code com o WhatsApp</h2>
+<p>Abra o WhatsApp > Menu (3 pontos) > Dispositivos conectados > Conectar dispositivo</p>
+<img id="qr" style="max-width:400px" />
+<p id="status" style="color:gray">Carregando QR Code...</p>
+<script>
+async function loadQR() {
+  try {
+    const res = await fetch('http://localhost:8080/instance/connect/villanova-whatsapp', {
+      headers: { 'apikey': 'VillaNova_Evo_2026_TestKey' }
+    });
+    const data = await res.json();
+    if (data.base64) {
+      document.getElementById('qr').src = data.base64;
+      document.getElementById('status').textContent = 'QR Code pronto! Escaneie com seu WhatsApp.';
+    } else {
+      document.getElementById('status').textContent = 'Já conectado ou QR expirado. Recarregue a página.';
+    }
+  } catch(e) {
+    document.getElementById('status').textContent = 'Erro: ' + e.message;
+  }
+}
+loadQR();
+setInterval(loadQR, 30000);
+</script>
+</body>
+</html>

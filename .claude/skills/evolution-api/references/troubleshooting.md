@@ -184,12 +184,64 @@ location / {
 
 ---
 
+## Docker Networking (Chatwoot + Evolution API)
+
+### `host.docker.internal` not resolving (ENOTFOUND)
+On Docker Desktop (Windows/WSL2), `host.docker.internal` can be unreliable. **Recommended approach:**
+
+Create a shared external network so containers communicate directly by name:
+```bash
+docker network create villanova-net
+```
+
+Add to both `docker-compose.yaml` files:
+```yaml
+# In the services that need cross-stack communication:
+networks:
+  - default        # keep internal network
+  - villanova-net  # shared network
+
+# At the bottom:
+networks:
+  villanova-net:
+    external: true
+```
+
+Then use container names as hostnames:
+- Evolution API → Chatwoot: `http://chatwoot-rails-1:3000`
+- Chatwoot → Evolution API: `http://evolution_api:8080`
+
+### `ENOTFOUND host` when updating message source ID
+Known issue in Evolution API v2.3.7 when using container names or `host.docker.internal`. Messages are delivered to WhatsApp successfully but Chatwoot shows "Falha ao enviar". The error occurs specifically in the `updateChatwootMessageSourceId` function. May resolve with real domain names in production.
+
+### Evolution Manager won't start (nginx error)
+The official `evoapicloud/evolution-manager:latest` image has a bug in its nginx config:
+```
+nginx: [emerg] invalid value "must-revalidate" in /etc/nginx/conf.d/nginx.conf:11
+```
+
+**Fix:** Create a corrected nginx config and mount it as a volume:
+1. Copy the original config, remove `must-revalidate` from the `gzip_proxied` line
+2. Mount in docker-compose:
+```yaml
+evolution-manager:
+  volumes:
+    - ./manager-nginx.conf:/etc/nginx/conf.d/nginx.conf:ro
+```
+
+### Chatwoot inbox webhook URL incorrect
+When `autoCreate: true`, Evolution API creates the inbox with a webhook URL based on `SERVER_URL`. If `SERVER_URL` is `localhost`, the Chatwoot container can't reach it. Fix:
+1. Set `SERVER_URL` to the container name: `http://evolution_api:8080`
+2. Update Chatwoot inbox webhook: `PATCH /api/v1/accounts/{id}/inboxes/{inbox_id}`
+
+---
+
 ## Useful Debug Commands
 
 ```bash
 # Check all instances
 curl -s http://localhost:8080/instance/fetchInstances \
-  -H "apikey: YOUR_API_KEY" | python -m json.tool
+  -H "apikey: YOUR_API_KEY"
 
 # Check specific instance connection
 curl -s http://localhost:8080/instance/connectionState/INSTANCE_NAME \
@@ -197,11 +249,19 @@ curl -s http://localhost:8080/instance/connectionState/INSTANCE_NAME \
 
 # Check Chatwoot config for instance
 curl -s http://localhost:8080/chatwoot/find/INSTANCE_NAME \
-  -H "apikey: YOUR_API_KEY" | python -m json.tool
+  -H "apikey: YOUR_API_KEY"
 
 # Check webhook config
 curl -s http://localhost:8080/webhook/find/INSTANCE_NAME \
-  -H "apikey: YOUR_API_KEY" | python -m json.tool
+  -H "apikey: YOUR_API_KEY"
+
+# Test container-to-container connectivity
+docker exec evolution_api wget -qO- --timeout=5 http://chatwoot-rails-1:3000/
+docker exec chatwoot-sidekiq-1 wget -qO- --timeout=5 http://evolution_api:8080/
+
+# Check Chatwoot inbox webhook URL
+curl -s http://localhost:3000/api/v1/accounts/1/inboxes \
+  -H "api_access_token: YOUR_CHATWOOT_TOKEN"
 
 # View Evolution API logs
 docker compose logs -f evolution-api --tail 100

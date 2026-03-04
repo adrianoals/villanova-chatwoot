@@ -15,7 +15,9 @@
       "Bash(curl:*)",
       "Bash(do docker:*)",
       "Bash(bash:*)",
-      "WebFetch(domain:doc.evolution-api.com)"
+      "WebFetch(domain:doc.evolution-api.com)",
+      "Bash(head:*)",
+      "Bash(cd:*)"
     ]
   }
 }

@@ -2,6 +2,7 @@
 .env
 *.env
 chatwoot/.env
+evolution-api/.env
 
 # Docker volumes and data
 postgres_data/
