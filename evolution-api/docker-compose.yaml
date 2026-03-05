@@ -16,6 +16,16 @@ services:
       - evolution-net
       - villanova-net
 
+  media-proxy:
+    container_name: evolution_media_proxy
+    image: nginx:alpine
+    restart: always
+    network_mode: "service:evolution-api"
+    depends_on:
+      - evolution-api
+    volumes:
+      - ./media-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+
   evolution-manager:
     container_name: evolution_manager
     image: evoapicloud/evolution-manager:latest
