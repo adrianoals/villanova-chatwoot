@@ -19,7 +19,8 @@
       "Bash(head:*)",
       "Bash(cd:*)",
       "Bash(echo Chatwoot ainda reiniciando...:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(/Users/adriano/Desktop/VillaNova/chatwoot/.env:*)"
     ]
   }
 }
