@@ -25,6 +25,7 @@ Todos os serviços compartilham a rede externa `villanova-net` para comunicaçã
 | Serviço | Container | Porta | Rede |
 |---------|-----------|-------|------|
 | Evolution API | evolution_api | 127.0.0.1:8080 | evolution-net + villanova-net |
+| Media Proxy (nginx) | evolution_media_proxy | — (compartilha rede do evolution_api) | network_mode: service:evolution-api |
 | Evolution Manager | evolution_manager | 127.0.0.1:9615 | evolution-net |
 | PostgreSQL | evolution_postgres | — (interno) | evolution-net |
 | Redis | evolution_redis | — (interno) | evolution-net |
@@ -113,8 +114,9 @@ VillaNova-Chatwoot/
 │   ├── .env                     # Variáveis de ambiente (NÃO comitar)
 │   └── favicons/                # Favicons customizados
 ├── evolution-api/
-│   ├── docker-compose.yaml      # Stack Evolution API (API, Manager, Postgres, Redis)
+│   ├── docker-compose.yaml      # Stack Evolution API (API, Media Proxy, Manager, Postgres, Redis)
 │   ├── .env                     # Variáveis de ambiente (NÃO comitar)
+│   ├── media-proxy.conf         # Nginx proxy: redireciona localhost:3000 → chatwoot-rails-1:3000 (só local)
 │   ├── manager-nginx.conf       # Fix nginx config do Manager (bug imagem oficial)
 │   └── qrcode.html              # Página auxiliar para escanear QR code
 ├── docs/
@@ -137,7 +139,8 @@ VillaNova-Chatwoot/
 
 ## Problemas Conhecidos (Local)
 
-- **"Falha ao enviar" no Chatwoot:** Mensagens enviadas pelo celular chegam no destinatário mas o status no Chatwoot mostra falha. Erro: `ENOTFOUND host` na Evolution API ao atualizar source ID. Provável bug da Evolution API com URLs de container. Testar se resolve em produção com domínios reais.
+- **"Falha ao enviar" no Chatwoot:** Mensagens enviadas pelo celular chegam no destinatário mas o status no Chatwoot mostra "Falha ao enviar". Erro: `ENOTFOUND host` na Evolution API ao atualizar source ID via `updateChatwootMessageSourceId`. Bug cosmético — as mensagens **são entregues** normalmente. Deve resolver em produção com domínios reais.
+- **Media (imagens/áudio/documentos) não enviava do Chatwoot → WhatsApp:** Causa raiz: `class-validator`'s `isURL()` rejeita URLs com `localhost` (sem TLD válido). A Evolution API trata a URL como base64, gerando dados inválidos → erro `Input buffer contains unsupported image format` no Sharp. **Solução:** `FRONTEND_URL=http://127.0.0.1:3000` no `.env` do Chatwoot (IPs passam no `isURL`) + nginx media-proxy sidecar no docker-compose da Evolution API. Em produção com domínios reais, o media-proxy **não é necessário**.
 - **Evolution Manager nginx bug:** A imagem oficial tem erro no `gzip_proxied` (valor `must-revalidate` inválido). Resolvido montando `manager-nginx.conf` como volume.
 - **Favicons se perdem** se recriar o container — na produção usar volume mount.
 
@@ -154,3 +157,5 @@ VillaNova-Chatwoot/
 - **Não comitar `.env`** — contém senhas e tokens
 - **Subir Chatwoot antes da Evolution API** — a rede `villanova-net` e o Rails precisam estar up
 - **Criar rede `villanova-net`** antes do primeiro `docker compose up`
+- **FRONTEND_URL no Chatwoot .env deve ser `http://127.0.0.1:3000`** (local) — `localhost` causa falha no envio de mídia pela Evolution API (bug do `isURL` do class-validator)
+- **Após reiniciar evolution-api, recriar media-proxy:** `docker compose up -d --force-recreate media-proxy` (o `network_mode: service:` pode perder binding)

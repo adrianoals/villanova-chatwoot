@@ -46,8 +46,14 @@ docker compose down
 # Logs
 docker compose logs -f evolution-api
 
+# Logs do media proxy (debug de mídia)
+docker compose logs -f media-proxy
+
 # Status
 docker compose ps
+
+# Recriar media-proxy após restart do evolution-api
+docker compose up -d --force-recreate media-proxy
 ```
 
 ## Subir tudo (ordem importa)
@@ -87,3 +93,19 @@ curl -X POST http://localhost:8080/message/sendText/villanova-whatsapp \
   -H "Content-Type: application/json" \
   -d '{"number": "5511999999999", "text": "Teste!"}'
 ```
+
+## Troubleshooting
+
+### Mídia (imagens/áudio/docs) não envia do Chatwoot → WhatsApp
+**Causa:** `class-validator` (`isURL()`) rejeita URLs com `localhost` (sem TLD). A Evolution API trata como base64 → dados inválidos → erro `Input buffer contains unsupported image format`.
+
+**Solução:**
+1. No `.env` do Chatwoot: `FRONTEND_URL=http://127.0.0.1:3000` (IPs passam no `isURL`)
+2. O media-proxy (nginx sidecar no docker-compose da Evolution API) redireciona `127.0.0.1:3000` → `chatwoot-rails-1:3000`
+3. Em produção com domínios reais, o media-proxy **não é necessário**
+
+### Media proxy perdeu conexão após restart
+```bash
+docker compose up -d --force-recreate media-proxy
+```
+O `network_mode: "service:evolution-api"` pode perder o binding se o container evolution-api for recriado.

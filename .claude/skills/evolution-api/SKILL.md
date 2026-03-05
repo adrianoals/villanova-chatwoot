@@ -93,6 +93,9 @@ Minimal `.env`:
 
 ```env
 SERVER_URL=http://localhost:8080
+# WARNING: In Docker, if Chatwoot uses FRONTEND_URL=http://localhost:3000,
+# media sending will FAIL because class-validator's isURL() rejects 'localhost' (no TLD).
+# Use http://127.0.0.1:3000 for FRONTEND_URL in the Chatwoot .env instead.
 AUTHENTICATION_API_KEY=YOUR_GLOBAL_API_KEY_HERE
 
 # Database
@@ -330,7 +333,7 @@ certbot --nginx -d api.empresa.com.br
 | Chatwoot not receiving messages | Verify `CHATWOOT_ENABLED=true`, check Chatwoot URL is reachable from the container |
 | 401 Unauthorized | Check `apikey` header matches `AUTHENTICATION_API_KEY` |
 | Messages not sending | Check connection state is `open`, verify the number format (country code + number) |
-| Media not sending | Ensure the URL is publicly accessible or use base64 |
+| Media not sending | Ensure the URL is publicly accessible or use base64. **In local Docker dev:** `class-validator`'s `isURL()` rejects `localhost` URLs (no TLD) — use `127.0.0.1` instead |
 
 > For detailed troubleshooting, see `references/troubleshooting.md`
 

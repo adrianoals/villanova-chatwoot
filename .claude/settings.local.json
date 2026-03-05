@@ -17,7 +17,9 @@
       "Bash(bash:*)",
       "WebFetch(domain:doc.evolution-api.com)",
       "Bash(head:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(echo Chatwoot ainda reiniciando...:*)",
+      "Bash(node:*)"
     ]
   }
 }

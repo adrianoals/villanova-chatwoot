@@ -17,6 +17,8 @@ docker network create villanova-net
 cd C:/Documentos/Projetos/VillaNova-Chatwoot/chatwoot
 
 # Criar .env se não existir (copiar de .env.example ou ver CLAUDE.md para variáveis)
+# IMPORTANTE: FRONTEND_URL deve ser http://127.0.0.1:3000 (NÃO localhost!)
+# localhost causa falha no envio de mídia pela Evolution API (bug do isURL do class-validator)
 docker compose up -d
 ```
 
@@ -26,7 +28,7 @@ docker compose logs -f rails
 # Esperar: "Puma starting... Listening on http://0.0.0.0:3000"
 ```
 
-Acessar: http://localhost:3000
+Acessar: http://127.0.0.1:3000
 
 ### Primeiro acesso
 - Criar conta de admin
@@ -120,9 +122,10 @@ curl -X POST http://localhost:8080/message/sendText/villanova-whatsapp \
   -d '{"number": "5511999999999", "text": "Teste Villa Nova!"}'
 ```
 
-A mensagem deve aparecer no Chatwoot em http://localhost:3000.
+A mensagem deve aparecer no Chatwoot em http://127.0.0.1:3000.
 
 ## Problemas conhecidos
 
-- **"Falha ao enviar" no Chatwoot:** Mensagens são entregues no WhatsApp mas status visual fica como falha. Bug da Evolution API com URLs de container (`ENOTFOUND host`). Deve resolver em produção com domínios reais.
+- **"Falha ao enviar" no Chatwoot:** Mensagens são entregues no WhatsApp mas status visual fica como falha. Erro `ENOTFOUND host` na Evolution API ao executar `updateChatwootMessageSourceId`. Bug cosmético — não afeta entrega. Deve resolver em produção com domínios reais.
+- **Mídia não envia do Chatwoot → WhatsApp:** `class-validator` (`isURL()`) rejeita URLs com `localhost` (sem TLD válido). **Solução:** usar `FRONTEND_URL=http://127.0.0.1:3000` no `.env` do Chatwoot + media-proxy nginx sidecar no docker-compose da Evolution API. Em produção com domínios reais, o media-proxy não é necessário.
 - **Evolution Manager não sobe:** Bug na imagem oficial do nginx. Resolvido com `manager-nginx.conf` montado como volume.

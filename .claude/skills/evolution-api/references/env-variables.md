@@ -26,7 +26,7 @@ Complete list of environment variables for Evolution API v2.
 | `SERVER_NAME` | `evolution` | Server name identifier |
 | `SERVER_TYPE` | `http` | Server type |
 | `SERVER_PORT` | `8080` | API port |
-| `SERVER_URL` | `http://localhost:8080` | Public URL of the API (used for webhooks, QR code, etc.) |
+| `SERVER_URL` | `http://localhost:8080` | Public URL of the API (used for webhooks, QR code, etc.). In Docker with Chatwoot, set to `http://evolution_api:8080` so the Chatwoot webhook URL is reachable. **Note:** `localhost` in URLs is accepted here because `SERVER_URL` is used for webhook configuration, not media download. The `isURL` problem only affects Chatwoot's `FRONTEND_URL` (see troubleshooting). |
 
 ## Database
 

@@ -67,6 +67,21 @@
 - Check file size limits (WhatsApp limits: 16MB images, 64MB video, 100MB documents)
 - For audio: WhatsApp expects opus codec in ogg container
 
+### Media not sending from Chatwoot (local Docker): `Input buffer contains unsupported image format`
+
+**Root cause:** Evolution API uses `class-validator`'s `isURL()` to check if media is a URL or base64. `isURL()` rejects `localhost` URLs because "localhost" has no valid TLD. When `isURL` returns false, Evolution API does `Buffer.from(url_string, "base64")` — producing garbage data that Sharp can't process.
+
+**Fix (two parts):**
+1. Set `FRONTEND_URL=http://127.0.0.1:3000` in Chatwoot's `.env` (IPs pass `isURL` validation)
+2. Add an nginx media-proxy sidecar to Evolution API's docker-compose that shares the network namespace (`network_mode: "service:evolution-api"`), listening on port 3000 and proxying to `chatwoot-rails-1:3000`
+
+This way, when Chatwoot sends a webhook with `data_url: http://127.0.0.1:3000/rails/active_storage/...`, Evolution API:
+1. Runs `isURL()` → returns `true` (IP is valid)
+2. Downloads the file from `127.0.0.1:3000` → nginx proxies to `chatwoot-rails-1:3000`
+3. Processes with Sharp → sends to WhatsApp successfully
+
+**In production with real domains, this is NOT needed** — real domain URLs pass `isURL` and resolve directly.
+
 ---
 
 ## Chatwoot Integration Issues
@@ -212,7 +227,13 @@ Then use container names as hostnames:
 - Chatwoot → Evolution API: `http://evolution_api:8080`
 
 ### `ENOTFOUND host` when updating message source ID
-Known issue in Evolution API v2.3.7 when using container names or `host.docker.internal`. Messages are delivered to WhatsApp successfully but Chatwoot shows "Falha ao enviar". The error occurs specifically in the `updateChatwootMessageSourceId` function. May resolve with real domain names in production.
+Known cosmetic issue in Evolution API v2.3.7 when using container names or `host.docker.internal`. Messages **are delivered** to WhatsApp successfully but Chatwoot shows "Falha ao enviar". The error occurs specifically in the `updateChatwootMessageSourceId` function. Does not affect message delivery. Should resolve in production with real domain names.
+
+### Media proxy lost connection after restart
+If `docker compose restart evolution-api` was used, the media-proxy may lose its network binding since it uses `network_mode: "service:evolution-api"`. Fix:
+```bash
+docker compose up -d --force-recreate media-proxy
+```
 
 ### Evolution Manager won't start (nginx error)
 The official `evoapicloud/evolution-manager:latest` image has a bug in its nginx config:

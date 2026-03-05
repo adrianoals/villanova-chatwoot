@@ -4,9 +4,10 @@ Step-by-step guide to integrate Evolution API with Chatwoot for WhatsApp multi-a
 
 ## Prerequisites
 
-1. **Chatwoot** running and accessible (e.g., `http://localhost:3000`)
+1. **Chatwoot** running and accessible (e.g., `http://127.0.0.1:3000`)
 2. **Evolution API** running (e.g., `http://localhost:8080`)
 3. Both services must be able to reach each other (same network or public URLs)
+4. **IMPORTANT (Local Docker only):** Chatwoot's `FRONTEND_URL` must use `127.0.0.1`, NOT `localhost`. The `class-validator` library used by Evolution API rejects `localhost` URLs (no valid TLD), which breaks media sending. IPs like `127.0.0.1` are accepted.
 
 ## Step 1: Enable Chatwoot in Evolution API
 
@@ -188,6 +189,47 @@ Then use container names as hostnames:
 - Set `SERVER_URL=http://evolution_api:8080` in Evolution API `.env`
 
 **Important:** Always start Chatwoot before Evolution API so the shared network and Rails container are ready.
+
+### Media Proxy (Local Development Only)
+
+When running locally with Docker, Chatwoot's `FRONTEND_URL` generates attachment URLs in webhook payloads (e.g., `http://127.0.0.1:3000/rails/active_storage/blobs/...`). These URLs need to resolve inside the Evolution API container.
+
+The solution is an nginx sidecar that shares the Evolution API's network namespace (`network_mode: "service:evolution-api"`), listening on port 3000 and proxying to `chatwoot-rails-1:3000`:
+
+```yaml
+media-proxy:
+  container_name: evolution_media_proxy
+  image: nginx:alpine
+  restart: always
+  network_mode: "service:evolution-api"
+  depends_on:
+    - evolution-api
+  volumes:
+    - ./media-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+```
+
+```nginx
+# media-proxy.conf
+server {
+    listen 3000;
+    listen [::]:3000;
+    server_name localhost;
+
+    location / {
+        proxy_pass http://chatwoot-rails-1:3000;
+        proxy_set_header Host localhost:3000;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+        client_max_body_size 100m;
+    }
+}
+```
+
+This way, when Evolution API downloads media from `http://127.0.0.1:3000/...`, nginx proxies it to Chatwoot's Rails container.
+
+**In production with real domains, this proxy is NOT needed** — real domain URLs pass `isURL` validation and resolve normally.
 
 ### Option B: Public URLs (production)
 
