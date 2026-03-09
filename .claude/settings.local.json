@@ -20,7 +20,8 @@
       "Bash(cd:*)",
       "Bash(echo Chatwoot ainda reiniciando...:*)",
       "Bash(node:*)",
-      "Bash(/Users/adriano/Desktop/VillaNova/chatwoot/.env:*)"
+      "Bash(/Users/adriano/Desktop/VillaNova/chatwoot/.env:*)",
+      "Bash(git:*)"
     ]
   }
 }
