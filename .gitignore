@@ -4,10 +4,17 @@
 chatwoot/.env
 evolution/.env
 
+# Traefik Let's Encrypt cert storage (regenerated on first run, but losing
+# acme.json mid-flight hits Let's Encrypt rate limits)
+traefik/letsencrypt/
+
 # Docker volumes and data
 postgres_data/
 redis_data/
 storage_data/
+
+# Local-only artifacts
+*.bak
 
 # Backups
 *.sql
