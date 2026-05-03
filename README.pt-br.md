@@ -13,7 +13,7 @@ Sistema de multiatendimento via WhatsApp self-hosted. Combina Chatwoot (helpdesk
 | **Helpdesk** | [Chatwoot](https://www.chatwoot.com/) (self-hosted) | Painel de atendentes, roteamento de conversas, times |
 | **API WhatsApp** | [Evolution API](https://github.com/EvolutionAPI/evolution-api) v2 | Conexão WhatsApp via Baileys (QR code, sem custo da Meta) |
 | **Bancos de dados** | PostgreSQL 15/16 + Redis | Persistência de dados e cache |
-| **Media Proxy** | Nginx (sidecar) | Solução local para entrega de mídia |
+| **Reverse proxy** | [Traefik](https://traefik.io/) v3.6 | Roteamento de tráfego, terminação TLS, certificados Let's Encrypt automáticos |
 | **Orquestração** | Docker Compose | Gerenciamento de containers e rede |
 
 ## Funcionalidades
@@ -24,125 +24,103 @@ Sistema de multiatendimento via WhatsApp self-hosted. Combina Chatwoot (helpdesk
 - Importação automática de contatos e merge de números brasileiros
 - Branding personalizado (logo, favicons) com a identidade do cliente
 - Comunicação entre serviços via rede Docker compartilhada (`villanova-net`)
-- Media proxy sidecar para resolver validação de URLs `localhost` em desenvolvimento local
+- SSL automático via Let's Encrypt (HTTP challenge do Traefik)
 
 ## Estrutura do Projeto
 
 ```
 villanova-chatwoot/
+├── traefik/
+│   ├── docker-compose.yaml      # Reverse proxy Traefik v3.6 + Let's Encrypt
+│   └── .env.example             # (sem vars obrigatórias por enquanto)
 ├── chatwoot/
-│   ├── docker-compose.yaml      # Stack Chatwoot (Rails, Sidekiq, Postgres, Redis)
+│   ├── docker-compose.yaml      # Stack Chatwoot (Rails, Sidekiq, Postgres, Redis) com labels Traefik
 │   ├── .env.example             # Template de variáveis de ambiente
-│   └── favicons/                # Favicons customizados para o painel
-├── evolution-api/
-│   ├── docker-compose.yaml      # Stack Evolution API (API, Media Proxy, Manager, Postgres, Redis)
-│   ├── .env.example             # Template de variáveis de ambiente
-│   ├── media-proxy.conf         # Nginx: proxy de 127.0.0.1:3000 → chatwoot-rails-1:3000
-│   ├── manager-nginx.conf       # Correção do bug do nginx do Evolution Manager oficial
-│   └── qrcode.html              # Página auxiliar para escanear QR code do WhatsApp
+│   └── favicons/                # Favicons customizados montados no container
+├── evolution/
+│   ├── docker-compose.yaml      # Stack Evolution API (API, Postgres, Redis) com labels Traefik
+│   └── .env.example             # Template de variáveis de ambiente
 ├── docs/
-│   ├── setup-local.md           # Guia completo de setup local
 │   └── docker.md                # Referência de comandos Docker
-├── image/                       # Favicons customizados
-└── CLAUDE.md                    # Contexto do projeto para desenvolvimento assistido por IA
+├── .claude/                     # Desenvolvimento assistido por IA (skills, settings)
+└── CLAUDE.md                    # Contexto do projeto para IA
 ```
 
-## Primeiros Passos
+> **Sem stack de desenvolvimento local.** Esse projeto roda apenas em produção. Edições passam por git → SSH na VPS → `git pull` → restart. Ver [guia de deploy VPS](.claude/skills/chatwoot-install/references/vps-production.md) pro setup completo do servidor.
 
-### Pré-requisitos
+## Stack de produção na VPS
 
-- Docker Desktop instalado e rodando
-- Portas livres: `3000`, `5432`, `6379`, `8080`, `9615`
+VPS: `villanova-vps` (`ssh villanova-vps`), código em `/opt/villanova/`.
 
-### 1. Criar a rede compartilhada
+A estrutura no servidor espelha esse repo. Cada `docker-compose.yaml` daqui tem um `.env` irmão (no gitignore) na VPS com os secrets reais.
+
+| Serviço | URL | Pra que serve |
+|---------|-----|---------|
+| Chatwoot | https://multi-chat.villanovacondominios.com.br | Painel dos atendentes |
+| Evolution API | https://evo.villanovacondominios.com.br | Bridge WhatsApp |
+| Evolution Manager | https://evo.villanovacondominios.com.br/manager | UI web pra gerenciar instâncias |
+
+## Fluxo de atualização
 
 ```bash
-docker network create villanova-net
+# No seu Mac:
+# 1. Edita um docker-compose.yaml ou outro config
+git add . && git commit -m "..." && git push
+
+# Na VPS (ssh villanova-vps):
+cd /opt/villanova
+git pull origin main
+
+# Restart do stack afetado:
+cd traefik && docker compose up -d
+cd ../chatwoot && docker compose up -d
+cd ../evolution && docker compose up -d
 ```
-
-### 2. Subir o Chatwoot
-
-```bash
-cd chatwoot
-cp .env.example .env   # Edite com suas credenciais
-docker compose up -d
-```
-
-Aguarde ~60 segundos para o Rails iniciar, depois acesse http://127.0.0.1:3000.
-
-### 3. Subir a Evolution API
-
-```bash
-cd evolution-api
-cp .env.example .env   # Edite com suas credenciais
-docker compose up -d
-```
-
-Verifique em http://localhost:8080 (Swagger em http://localhost:8080/docs).
-
-### 4. Criar instância WhatsApp
-
-```bash
-curl -X POST http://localhost:8080/instance/create \
-  -H "apikey: SUA_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "instanceName": "villanova-whatsapp",
-    "integration": "WHATSAPP-BAILEYS",
-    "qrcode": true,
-    "chatwootAccountId": "1",
-    "chatwootToken": "SEU_CHATWOOT_ACCESS_TOKEN",
-    "chatwootUrl": "http://chatwoot-rails-1:3000",
-    "chatwootSignMsg": true,
-    "chatwootReopenConversation": true,
-    "chatwootAutoCreate": true,
-    "chatwootNameInbox": "WhatsApp Villa Nova",
-    "chatwootImportContacts": true,
-    "chatwootMergeBrazilContacts": true
-  }'
-```
-
-### 5. Conectar WhatsApp
-
-```bash
-curl http://localhost:8080/instance/connect/villanova-whatsapp \
-  -H "apikey: SUA_API_KEY"
-```
-
-Escaneie o QR code retornado com o WhatsApp no celular.
-
-> Para instruções detalhadas de setup, troubleshooting e comandos Docker, veja [docs/setup-local.md](docs/setup-local.md) e [docs/docker.md](docs/docker.md).
 
 ## Variáveis de Ambiente
 
-Ambos os serviços precisam de arquivos `.env`. Copie os exemplos e preencha seus valores:
+Cada stack na VPS tem seu próprio `.env` (gitignored, com secrets reais). Templates versionados aqui:
 
-- `chatwoot/.env.example` — Configuração do Chatwoot (Rails, Postgres, Redis, SMTP)
-- `evolution-api/.env.example` — Configuração da Evolution API (auth, banco, integração Chatwoot)
+- `chatwoot/.env.example` — Configuração do Chatwoot (Rails, Postgres, Redis, SMTP, FRONTEND_URL)
+- `evolution/.env.example` — Configuração da Evolution API (auth, banco, integração Chatwoot, workaround do bug)
+- `traefik/.env.example` — Traefik (sem vars obrigatórias por enquanto)
 
-> **Importante:** O `FRONTEND_URL` no `.env` do Chatwoot deve usar `http://127.0.0.1:3000` (não `localhost`) para desenvolvimento local. O hostname `localhost` falha na validação de URL do `class-validator` da Evolution API, quebrando o envio de mídia. Em produção com domínios reais, isso não é um problema.
+Pra operação dia a dia, veja [docs/operations.md](docs/operations.md).
 
 ## Arquitetura
 
+### Produção (VPS)
+
 ```
-┌──────────────────┐       ┌──────────────────┐
-│     Chatwoot      │       │   Evolution API   │
-│  (Rails + Sidekiq)│◄─────►│  (WhatsApp Bridge)│
-│   :3000           │       │   :8080           │
-└────────┬─────────┘       └────────┬─────────┘
-         │                          │
-    villanova-net              villanova-net
-         │                          │
-   ┌─────┴─────┐             ┌─────┴──────┐
-   │ PostgreSQL │             │ PostgreSQL  │
-   │   + Redis  │             │   + Redis   │
-   └───────────┘             └────────────┘
-                                    │
-                              ┌─────┴─────┐
-                              │  WhatsApp  │
-                              │  (Baileys) │
-                              └───────────┘
+              Internet (HTTPS)
+                    │
+            ┌───────┴───────┐
+            │    Traefik    │  ← Let's Encrypt (auto)
+            │  :80 :443     │
+            └───┬───────┬───┘
+                │       │
+   ┌────────────┘       └────────────┐
+   │                                 │
+┌──┴────────────────┐    ┌──────────┴────────┐
+│     Chatwoot      │    │   Evolution API   │
+│  (Rails + Sidekiq)│◄──►│  (WhatsApp Bridge)│
+│  :3000 (interno)  │    │  :8080 (interno)  │
+└────────┬──────────┘    └────────┬──────────┘
+         │                        │
+    villanova-net             villanova-net
+         │                        │
+   ┌─────┴──────┐           ┌─────┴──────┐
+   │ PostgreSQL │           │ PostgreSQL │
+   │   + Redis  │           │   + Redis  │
+   └────────────┘           └────────────┘
+                                  │
+                            ┌─────┴─────┐
+                            │  WhatsApp │
+                            │  (Baileys)│
+                            └───────────┘
 ```
+
+Traefik termina TLS, roteia por subdomínio e emite certificados Let's Encrypt automaticamente. Portas do Chatwoot e Evolution API **não** ficam expostas publicamente — só Traefik escuta nas 80/443.
 
 ---
 

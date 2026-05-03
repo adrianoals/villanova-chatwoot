@@ -2,160 +2,107 @@
 
 ## Sobre o Projeto
 
-Sistema de multiatendimento via WhatsApp para a empresa Villa Nova Condomínios, baseado em Chatwoot self-hosted + Evolution API.
+Sistema de multiatendimento via WhatsApp para a empresa Villa Nova Condomínios, baseado em Chatwoot self-hosted + Evolution API. **Roda apenas em produção** — não há setup de desenvolvimento local.
 
 - **Cliente:** Villa Nova Condomínios — https://villanovacondominios.com.br
-- **Escopo técnico:** `escopo_tecnico_chatwoot_multidepartamento.docx`
+- **Escopo técnico:** `docs/escopo_tecnico_chatwoot_multidepartamento.docx`
 
-## Stack Local (Docker)
+## Topologia de produção
 
-Todos os serviços compartilham a rede externa `villanova-net` para comunicação direta entre containers.
+VPS Hostinger acessível via `ssh villanova-vps` (chave dedicada `~/.ssh/villanova_vps`). Código no servidor em `/opt/villanova/` espelha esse repo. Cada `docker-compose.yaml` tem um `.env` irmão (no `.gitignore`) com secrets reais.
 
-### Chatwoot (`chatwoot/docker-compose.yaml`)
+| Stack | Container(s) | URL pública |
+|-------|--------------|-------------|
+| **Traefik v3.6** | `traefik` (80, 443) | — (terminação TLS) |
+| **Chatwoot v4.13.0** | `chatwoot-rails-1`, `chatwoot-sidekiq-1`, `chatwoot-postgres-1`, `chatwoot-redis-1` | https://multi-chat.villanovacondominios.com.br |
+| **Evolution API v2.3.7** | `evolution_api`, `evolution_postgres`, `evolution_redis` | https://evo.villanovacondominios.com.br |
+| **Evolution Manager** | (embedded em `evolution_api`) | https://evo.villanovacondominios.com.br/manager |
 
-| Serviço | Container | Porta | Rede |
-|---------|-----------|-------|------|
-| Chatwoot (Rails) | chatwoot-rails-1 | 127.0.0.1:3000 | default + villanova-net |
-| Chatwoot (Sidekiq) | chatwoot-sidekiq-1 | — | default + villanova-net |
-| PostgreSQL | chatwoot-postgres-1 | 127.0.0.1:5432 | default |
-| Redis | chatwoot-redis-1 | 127.0.0.1:6379 | default |
+Todos compartilham a rede externa Docker `villanova-net`. Traefik descobre serviços via labels.
 
-### Evolution API (`evolution-api/docker-compose.yaml`)
-
-| Serviço | Container | Porta | Rede |
-|---------|-----------|-------|------|
-| Evolution API | evolution_api | 127.0.0.1:8080 | evolution-net + villanova-net |
-| Media Proxy (nginx) | evolution_media_proxy | — (compartilha rede do evolution_api) | network_mode: service:evolution-api |
-| Evolution Manager | evolution_manager | 127.0.0.1:9615 | evolution-net |
-| PostgreSQL | evolution_postgres | — (interno) | evolution-net |
-| Redis | evolution_redis | — (interno) | evolution-net |
-
-### Rede compartilhada
+## Fluxo de trabalho (edição → produção)
 
 ```bash
-# Criar a rede (só na primeira vez)
-docker network create villanova-net
+# No Mac:
+git add . && git commit -m "..." && git push
+
+# Na VPS:
+ssh villanova-vps
+cd /opt/villanova && git pull
+# Reiniciar o stack afetado:
+cd <traefik|chatwoot|evolution> && docker compose up -d
 ```
 
-Os serviços se comunicam pelos nomes dos containers:
-- Evolution API → Chatwoot: `http://chatwoot-rails-1:3000`
-- Chatwoot → Evolution API: `http://evolution_api:8080`
+`.env` ficam **só na VPS** (gitignored). Pra mudanças neles, edita direto via SSH.
 
-### Comandos essenciais
+## Comandos essenciais (na VPS)
 
 ```bash
-# Subir tudo (Chatwoot primeiro, depois Evolution)
-cd C:/Documentos/Projetos/VillaNova-Chatwoot/chatwoot && docker compose up -d
-cd C:/Documentos/Projetos/VillaNova-Chatwoot/evolution-api && docker compose up -d
+ssh villanova-vps
 
-# Parar tudo
-cd C:/Documentos/Projetos/VillaNova-Chatwoot/evolution-api && docker compose down
-cd C:/Documentos/Projetos/VillaNova-Chatwoot/chatwoot && docker compose down
+# Status e logs
+cd /opt/villanova/<stack> && docker compose ps
+cd /opt/villanova/chatwoot && docker compose logs -f rails
+cd /opt/villanova/evolution && docker compose logs -f evolution-api
 
-# Ver status
-docker compose -f chatwoot/docker-compose.yaml ps
-docker compose -f evolution-api/docker-compose.yaml ps
+# Backup banco Chatwoot
+cd /opt/villanova/chatwoot && docker compose exec -T postgres \
+  pg_dump -U postgres chatwoot_production | gzip > /opt/villanova/backups/chatwoot_$(date +%Y%m%d).sql.gz
 
-# Ver logs
-docker compose -f chatwoot/docker-compose.yaml logs -f rails
-docker compose -f evolution-api/docker-compose.yaml logs -f evolution-api
-
-# Backup do banco Chatwoot
-docker compose -f chatwoot/docker-compose.yaml exec postgres pg_dump -U postgres chatwoot_production > backup.sql
+# Reiniciar tudo
+for s in traefik chatwoot evolution; do (cd /opt/villanova/$s && docker compose restart); done
 ```
 
-### Credenciais locais (somente teste)
+## Branding (Chatwoot)
 
-**Chatwoot:**
-- Banco: postgres / chatwoot_pg_2026 / chatwoot_production
-- Redis: chatwoot_redis_2026
-- Painel: http://localhost:3000
-- Super Admin: http://localhost:3000/super_admin
-- API Access Token: `CJH4564njPfz6jhzEuj12fHr`
-
-**Evolution API:**
-- API: http://localhost:8080 (Swagger: http://localhost:8080/docs)
-- Manager: http://localhost:9615
-- API Key: `VillaNova_Evo_2026_TestKey`
-- Banco: evolution / evolution_pass_2026 / evolution_db
-
-**Instância WhatsApp:**
-- Nome: `villanova-whatsapp`
-- Número conectado: 5511994542767
-- Integration: WHATSAPP-BAILEYS
-- Inbox no Chatwoot: "WhatsApp Villa Nova" (ID: 1)
-
-## Branding
-
-- **Logo:** https://villanovacondominios.com.br/wp-content/uploads/2022/11/cropped-Logo-17.jpg
-- **Nome:** Villa Nova
-- **Favicons:** `chatwoot/favicons/` (copiados manualmente para o container)
-
-Para alterar branding, usar Rails runner (nunca SQL direto):
+Logo, nome e favicons já aplicados. Pra mudar via Rails runner:
 
 ```bash
-docker compose -f chatwoot/docker-compose.yaml exec -T rails bundle exec rails runner '
+ssh villanova-vps
+cd /opt/villanova/chatwoot && docker compose exec -T rails bundle exec rails runner '
   InstallationConfig.find_by(name: "LOGO").update!(
     serialized_value: ActiveSupport::HashWithIndifferentAccess.new(value: "URL_DO_LOGO")
   )
+  # idem pra INSTALLATION_NAME, BRAND_NAME, LOGO_THUMBNAIL, LOGO_DARK
 '
-docker compose -f chatwoot/docker-compose.yaml exec redis redis-cli -a chatwoot_redis_2026 FLUSHALL
-docker compose -f chatwoot/docker-compose.yaml restart rails sidekiq
+docker compose exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" FLUSHALL'
+docker compose restart rails sidekiq
 ```
 
-## Estrutura do Projeto
-
-```
-VillaNova-Chatwoot/
-├── CLAUDE.md                    # Este arquivo
-├── .gitignore
-├── chatwoot/
-│   ├── docker-compose.yaml      # Stack Chatwoot (Rails, Sidekiq, Postgres, Redis)
-│   ├── .env                     # Variáveis de ambiente (NÃO comitar)
-│   └── favicons/                # Favicons customizados
-├── evolution-api/
-│   ├── docker-compose.yaml      # Stack Evolution API (API, Media Proxy, Manager, Postgres, Redis)
-│   ├── .env                     # Variáveis de ambiente (NÃO comitar)
-│   ├── media-proxy.conf         # Nginx proxy: redireciona localhost:3000 → chatwoot-rails-1:3000 (só local)
-│   ├── manager-nginx.conf       # Fix nginx config do Manager (bug imagem oficial)
-│   └── qrcode.html              # Página auxiliar para escanear QR code
-├── docs/
-│   └── docker.md                # Comandos Docker úteis
-├── .claude/
-│   └── skills/
-│       ├── chatwoot/            # Skill: API do Chatwoot (curl)
-│       ├── chatwoot-install/    # Skill: Instalação do Chatwoot
-│       └── evolution-api/       # Skill: Evolution API v2 (endpoints, env vars, troubleshooting)
-└── escopo_tecnico_chatwoot_multidepartamento.docx
-```
+Favicons: arquivos em `chatwoot/favicons/` montados como volumes (sobrevivem a recreations).
 
 ## Decisões Técnicas
 
 - **API WhatsApp:** Evolution API v2.3.7 (open-source, self-hosted, gratuita)
-- **Integração:** WHATSAPP-BAILEYS (via QR code, sem custo da Meta)
-- **Automações:** Python (FastAPI) em vez de N8N — mais leve e mais controle
-- **VPS:** Hostinger disponível para testes, provedor final a definir com o cliente
-- **Instalação VPS:** Plano é usar Claude Code direto na VPS para instalação
+- **Integração WhatsApp:** Baileys (via QR code, sem custo da Meta)
+- **Reverse proxy:** **Traefik v3.6** (não Nginx+Certbot) — labels descobrem serviços, Let's Encrypt automático
+- **VPS:** Hostinger Ubuntu 24.04 (`69.62.96.47`)
+- **SSH:** chave-only (senha desabilitada), porta 22 + 80 + 443 via UFW, fail2ban ativo
+- **Automações futuras:** FastAPI em Python (planejado, ainda não implementado)
 
-## Problemas Conhecidos (Local)
+## Problemas Conhecidos / Workarounds
 
-- **"Falha ao enviar" no Chatwoot:** Mensagens enviadas pelo celular chegam no destinatário mas o status no Chatwoot mostra "Falha ao enviar". Erro: `ENOTFOUND host` na Evolution API ao atualizar source ID via `updateChatwootMessageSourceId`. Bug cosmético — as mensagens **são entregues** normalmente. Deve resolver em produção com domínios reais.
-- **Media (imagens/áudio/documentos) não enviava do Chatwoot → WhatsApp:** Causa raiz: `class-validator`'s `isURL()` rejeita URLs com `localhost` (sem TLD válido). A Evolution API trata a URL como base64, gerando dados inválidos → erro `Input buffer contains unsupported image format` no Sharp. **Solução:** `FRONTEND_URL=http://127.0.0.1:3000` no `.env` do Chatwoot (IPs passam no `isURL`) + nginx media-proxy sidecar no docker-compose da Evolution API. Em produção com domínios reais, o media-proxy **não é necessário**.
-- **Evolution Manager nginx bug:** A imagem oficial tem erro no `gzip_proxied` (valor `must-revalidate` inválido). Resolvido montando `manager-nginx.conf` como volume.
-- **Favicons se perdem** se recriar o container — na produção usar volume mount.
+### Bug "Falha ao enviar" da Evolution v2.3.7 — workaround aplicado
+
+**Sintoma:** Mensagens enviadas pelo Chatwoot são entregues no WhatsApp mas o status visual no painel Chatwoot mostra "Falha ao enviar".
+
+**Causa raiz:** `isImportHistoryAvailable()` retorna `true` mesmo sem `CHATWOOT_IMPORT_DATABASE_CONNECTION_URI` configurado, porque a URI cai num default hardcoded bugado (`postgresql://user:passwprd@host:5432/chatwoot...` — typo "passwprd" e hostname literal "host"). Isso faz toda mensagem outbound disparar `updateChatwootMessageSourceId` que tenta resolver "host" via DNS → `getaddrinfo EAI_AGAIN host` → Chatwoot nunca recebe a confirmação → marca como falha.
+
+**Workaround (aplicado):** definir `CHATWOOT_IMPORT_DATABASE_CONNECTION_URI=postgres://user:password@hostname:port/dbname` no `.env` da Evolution. Esse é o placeholder *exato* que a função verifica como "não configurado" — força `isImportHistoryAvailable() === false`, desativando o método bugado.
+
+**Quando remover:** quando Evolution lançar release com fix oficial. Acompanhar https://github.com/EvolutionAPI/evolution-api/releases.
 
 ## Próximos Passos
 
-1. Configurar departamentos/teams no Chatwoot (Comercial, Suporte, Financeiro)
-2. Deploy na VPS Hostinger (Chatwoot + Evolution API + Nginx + SSL)
-3. Validar se erro de status resolve em produção
-4. Montar automações Python (FastAPI)
-5. Apresentar ao cliente
+1. **Configurar SMTP** no `chatwoot/.env` (necessário pra convidar agentes, password reset)
+2. **Backup automatizado** (cron diário com `pg_dump` + storage_data, off-site recomendado)
+3. **Departamentos/teams** no Chatwoot (Comercial, Suporte, Financeiro) via UI
+4. **Automações Python (FastAPI)** se necessárias
+5. **Apresentar ao cliente**
 
 ## Cuidados
 
-- **Não comitar `.env`** — contém senhas e tokens
-- **Subir Chatwoot antes da Evolution API** — a rede `villanova-net` e o Rails precisam estar up
-- **Criar rede `villanova-net`** antes do primeiro `docker compose up`
-- **FRONTEND_URL no Chatwoot .env deve ser `http://127.0.0.1:3000`** (local) — `localhost` causa falha no envio de mídia pela Evolution API (bug do `isURL` do class-validator)
-- **Após reiniciar evolution-api, recriar media-proxy:** `docker compose up -d --force-recreate media-proxy` (o `network_mode: service:` pode perder binding)
+- **Nunca comitar `.env`** — secrets reais ficam só na VPS, repo só tem `.env.example`
+- **Não rodar `git pull` na VPS sem revisar `git diff`** — verifica o que vai mudar
+- **Antes de `docker compose up -d` em produção** — confirma que não vai derrubar conexão WhatsApp ativa no horário comercial
+- **SECRET_KEY_BASE** do Chatwoot é o secret mais crítico — perda = sessões/tokens encriptados quebram. Salvar em gerenciador de senhas (1Password / Bitwarden).

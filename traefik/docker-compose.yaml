@@ -1,0 +1,39 @@
+services:
+  traefik:
+    image: traefik:v3.6
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      # Provider Docker (descobre serviços via labels)
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=villanova-net
+      # Entrypoints
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      # Lets Encrypt (HTTP challenge)
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.le.acme.email=dri.limasantos@gmail.com
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      # Logs
+      - --log.level=INFO
+      - --accesslog=true
+      # Dashboard (acessivel apenas via SSH tunnel — nao exposto publicamente)
+      - --api.dashboard=true
+      - --api.insecure=true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:8080:8080"  # dashboard interno
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    networks:
+      - villanova-net
+
+networks:
+  villanova-net:
+    external: true

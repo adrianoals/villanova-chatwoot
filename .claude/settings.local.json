@@ -21,7 +21,11 @@
       "Bash(echo Chatwoot ainda reiniciando...:*)",
       "Bash(node:*)",
       "Bash(/Users/adriano/Desktop/VillaNova/chatwoot/.env:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(ssh villanova-vps *)",
+      "Bash(openssl s_client -connect chat.69-62-96-47.sslip.io:443 -servername chat.69-62-96-47.sslip.io)",
+      "Bash(openssl x509 *)",
+      "Bash(gh search *)"
     ]
   }
 }
