@@ -25,7 +25,11 @@
       "Bash(ssh villanova-vps *)",
       "Bash(openssl s_client -connect chat.69-62-96-47.sslip.io:443 -servername chat.69-62-96-47.sslip.io)",
       "Bash(openssl x509 *)",
-      "Bash(gh search *)"
+      "Bash(gh search *)",
+      "Bash(unzip -p escopo_tecnico_chatwoot_multidepartamento.docx word/document.xml)",
+      "Bash(ssh-keygen -t ed25519 -f ~/.ssh/villanova_vps -N \"\" -C \"villanova-windows-$\\(date +%Y%m%d\\)\")",
+      "PowerShell(Out-Null *)",
+      "Bash(ssh *)"
     ]
   }
 }

@@ -12,7 +12,7 @@ Sistema de **multiatendimento WhatsApp** (Villa Nova Condomínios). Stack:
 - **Traefik v3.6** — reverse proxy + SSL Let's Encrypt automático
 - **Hostinger VPS** Ubuntu 24.04
 
-**Roda APENAS em produção.** Sem stack de desenvolvimento local. Edita arquivos no Mac → `git push` → SSH na VPS → `git pull` → `docker compose up -d`.
+**Roda APENAS em produção.** Sem stack de desenvolvimento local. Edita arquivos na máquina local (Windows) → `git push` → SSH na VPS → `git pull` → `docker compose up -d`.
 
 ## URLs (produção)
 
@@ -25,15 +25,18 @@ Sistema de **multiatendimento WhatsApp** (Villa Nova Condomínios). Stack:
 ## Acesso à VPS
 
 ```bash
-ssh villanova-vps    # alias em ~/.ssh/config
+ssh villanova-vps    # alias em C:\Users\<user>\.ssh\config
 # Por baixo: ssh -i ~/.ssh/villanova_vps root@69.62.96.47
 ```
 
-- **Auth**: chave SSH apenas (senha desabilitada). Chave dedicada: `~/.ssh/villanova_vps`
+- **Auth**: chave SSH apenas (senha desabilitada). Chave dedicada no Windows: `C:\Users\<user>\.ssh\villanova_vps` (ed25519).
+- **Alias**: `Host villanova-vps` → `root@69.62.96.47` em `C:\Users\<user>\.ssh\config`.
 - **Código**: `/opt/villanova/` é um clone deste repo (mesmo branch `main`)
 - **Firewall**: UFW abre só 22, 80, 443. fail2ban monitora SSH.
 
-## Estrutura (Mac e VPS são espelhos via git)
+> **Histórico (2026-05-31):** projeto migrou de Mac para Windows e a VPS foi reinstalada (host key mudou). A chave antiga do Mac foi perdida; gerou-se uma chave nova no Windows e sua pública foi instalada via painel Hostinger (seção "Chaves SSH"). Caminhos `~/Documents/...` antigos deste doc referem-se ao Mac.
+
+## Estrutura (máquina local e VPS são espelhos via git)
 
 ```
 villanova-chatwoot/
@@ -59,7 +62,7 @@ villanova-chatwoot/
 ## Workflow padrão de qualquer mudança
 
 ```bash
-# Mac:
+# Máquina local (Windows):
 git add . && git commit -m "msg" && git push
 
 # VPS:
@@ -83,7 +86,7 @@ ssh villanova-vps 'cat /opt/villanova/evolution/.env'
 
 ### 2. Nunca cole senhas/tokens no chat
 
-- Senhas vão em **arquivos locais no Mac** (ex: `~/Documents/Projetos/villanova-chatwoot-vps-backup/`) com `chmod 600`
+- Senhas vão em **arquivos locais na máquina** (ex: `C:\Documentos\Projetos\villanova-chatwoot-vps-backup\`) com permissão restrita ao usuário
 - Quando criar usuário Chatwoot novo, gera senha aleatória, salva em arquivo, mostra **path** ao usuário (não conteúdo)
 
 ### 3. Nada de `docker compose down` em horário comercial
@@ -125,7 +128,7 @@ Pra verificar que tudo tá rodando antes de qualquer mudança:
 
 ```bash
 # Sync
-cd ~/Documents/Projetos/villanova-chatwoot && git status
+cd C:\Documentos\Projetos\VillaNova-Chatwoot && git status
 ssh villanova-vps 'cd /opt/villanova && git status && git log --oneline -3'
 
 # Containers
@@ -151,7 +154,7 @@ ssh villanova-vps 'EVO_KEY=$(grep AUTHENTICATION_API_KEY /opt/villanova/evolutio
 Conversas do Claude Code persistem em `~/.claude/projects/<encoded-path>/<session-id>.jsonl` (não nos servidores Anthropic). Pra retomar:
 
 ```bash
-cd ~/Documents/Projetos/villanova-chatwoot
+cd C:\Documentos\Projetos\VillaNova-Chatwoot
 claude --resume     # picker interativo
 # ou claude --resume <session-id> se souber o ID
 ```
