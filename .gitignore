@@ -31,6 +31,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Claude Code local settings (per-machine permissions/config)
+.claude/settings.local.json
+
 # Node
 node_modules/
 
